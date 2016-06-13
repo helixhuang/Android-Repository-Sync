@@ -37,5 +37,6 @@ namespace cn.antontech.SyncClient
         {
             return new Uri(new Uri(uri), path).AbsoluteUri;
         }
+
     }
 }

@@ -24,22 +24,30 @@ namespace cn.antontech.SyncClient
 
         static async Task MainAsync(string[] args)
         {
-            logger.Info("开始抓取");
+            logger.Info("Start Sync");
             string baseDir = Settings.Default.BaseDir;
             if (!(Directory.Exists(baseDir)))
             {
                 Directory.CreateDirectory(baseDir);
             }
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/repository-10.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/addon.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/addon-6.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/extras/intel/addon.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/sys-img/android-tv/sys-img.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/sys-img/android-wear/sys-img.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/sys-img/android/sys-img.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/sys-img/google_apis/sys-img.xml");
-            await DownloadAddon("https://dl-ssl.google.com/android/repository/sys-img/x86/addon-x86.xml");
-            await DownloadAddon("https://dl-ssl.google.com/glass/gdk/addon.xml");
+
+            await DownloadAddon("https://dl.google.com/android/repository/repository-12.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/repository2-1.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/addon.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/addon2-1.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/extras/intel/addon.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/extras/intel/addon2-1.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/android-tv/sys-img.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/android-tv/sys-img2-1.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/android-wear/sys-img.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/android-wear/sys-img2-1.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/android/sys-img.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/android/sys-img2-1.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/google_apis/sys-img.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-1.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/glass/addon.xml");
+            await DownloadAddon("https://dl.google.com/android/repository/glass/addon2-1.xml");
+
 
         }
         static async Task DownloadAddon(string remoteAddonUri)
@@ -56,17 +64,17 @@ namespace cn.antontech.SyncClient
             }
             string localAddonFile = Path.Combine(localBaseDir, URIHelper.GetUriFile(remoteAddonUri));
 
-            logger.Info("开始下载:{0}", remoteAddonUri);
+            logger.Info("Start Download:{0}", remoteAddonUri);
             try
             {
                 await DownloadFile(remoteAddonUri, localAddonFile);
             }
             catch (Exception ex)
             {
-                logger.Error(string.Format("下载失败:{0}", remoteAddonUri), ex);
+                logger.Error(string.Format("Download Failed:{0}", remoteAddonUri), ex);
                 return;
             }
-            logger.Info("完成下载:{0}", remoteAddonUri);
+            logger.Info("Download Complated:{0}", remoteAddonUri);
             XmlDocument doc = new XmlDocument();
             try
             {
@@ -74,27 +82,33 @@ namespace cn.antontech.SyncClient
             }
             catch (Exception ex)
             {
-                logger.Error(string.Format("解析失败:{0}", localAddonFile), ex);
+                logger.Error(string.Format("Parse Failed:{0}", localAddonFile), ex);
                 return;
             }
-            logger.Info("完成解析:{0}", localAddonFile);
+            logger.Info("Parse Complated:{0}", localAddonFile);
             //标记是否需要重新保存xml
             bool needSave = false;
             string ns = doc.DocumentElement.NamespaceURI;
-            foreach (XmlElement node in doc.GetElementsByTagName("archive", ns))
+            string tagName = "archive";
+            if (ns == "http://schemas.android.com/sdk/android/repo/addon2/01")
+            {
+                ns = "";
+                tagName = "complete";
+            }
+            foreach (XmlElement node in doc.GetElementsByTagName(tagName, ns))
             {
                 long size = Int64.Parse(node.GetElementsByTagName("size", ns)[0].InnerText);
                 string checkSum = node.GetElementsByTagName("checksum", ns)[0].InnerText;
                 string url = node.GetElementsByTagName("url", ns)[0].InnerText;
                 string localFileName = string.Empty;
                 string remoteFileUri = string.Empty;
-                if (url.StartsWith("https:"))
+                if (url.StartsWith("https:") || url.StartsWith("http:"))
                 {
                     //如果URL不是相对路径
                     localFileName = Path.Combine(localBaseDir, URIHelper.GetUriFile(url));
                     remoteFileUri = url;
                     //更新xml文件
-                    node.GetElementsByTagName("url", ns)[0].InnerText = localFileName;
+                    node.GetElementsByTagName("url", ns)[0].InnerText = new Uri(url).AbsolutePath;
                     needSave = true;
                 }
                 else
@@ -104,18 +118,18 @@ namespace cn.antontech.SyncClient
                 }
                 if (File.Exists(localFileName) && IsSame(localFileName, checkSum))
                 {
-                    logger.Info("文件无变化:{0}", localFileName);
+                    logger.Info("Nothing Changed:{0}", localFileName);
                 }
                 else
                 {
-                    logger.Info("开始下载:{0}", remoteFileUri);
+                    logger.Info("Start Download:{0}", remoteFileUri);
                     try
                     {
                         await DownloadFile(remoteFileUri, localFileName);
                     }
                     catch (Exception ex)
                     {
-                        logger.Error(string.Format("下载失败:{0}", remoteFileUri), ex);
+                        logger.Error(string.Format("Download Failed:{0}", remoteFileUri), ex);
                     }
                 }
             }
